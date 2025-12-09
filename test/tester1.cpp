@@ -137,3 +137,85 @@ TEST_CASE("Incremental decrease updates downstream shortest paths correctly", "[
 
     CHECK(st.parent[0] == -1);
 }
+
+TEST_CASE("Incremental decrease is a no-op when it cannot improve paths", "[dijkstra][incremental]") {
+    // Graph:
+    // 0 -> 1 (1)
+    // 1 -> 2 (2)
+    // 0 -> 2 (2)  // already shortest path to 2
+    //
+    // From 0:
+    // dist[2] = 2 via 0->2
+    // Decreasing (1,2) from 2 to 1 yields path 0->1->2 with cost 2,
+    // which ties the existing best path, so no strict improvement.
+
+    WeightedDigraph G(3);
+    G.addEdge(0, 1, 1.0);
+    G.addEdge(1, 2, 2.0);
+    G.addEdge(0, 2, 2.0);
+
+    DynamicDijkstra engine(G, 0);
+    DijkstraState st = engine.recompute();
+
+    REQUIRE(approx_equal(st.dist[2], 2.0));
+
+    // Decrease (1,2) weight but only to match current best path cost
+    double oldW = G.updateEdgeWeight(1, 2, 1.0);
+    REQUIRE(approx_equal(oldW, 2.0));
+
+    // Snapshot state before incremental call
+    auto oldDist = st.dist;
+    auto oldParent = st.parent;
+
+    engine.incrementalDecrease(st, 1, 2);
+
+    // Distances and parents should remain unchanged
+    REQUIRE(st.dist.size() == oldDist.size());
+    for (size_t i = 0; i < st.dist.size(); ++i) {
+        CHECK(approx_equal(st.dist[i], oldDist[i]));
+        CHECK(st.parent[i] == oldParent[i]);
+    }
+}
+
+TEST_CASE("Increase on tree vs non-tree edge signals recompute correctly", "[dijkstra][increase]") {
+    // Graph:
+    // 0 -> 1 (1)
+    // 1 -> 2 (1)
+    // 0 -> 2 (5)
+    //
+    // Shortest paths from 0:
+    // dist[0] = 0
+    // dist[1] = 1
+    // dist[2] = 2 via 0->1->2
+    //
+    // Edge (1,2) is on the shortest-path tree.
+    // Edge (0,2) is not.
+
+    WeightedDigraph G(3);
+    G.addEdge(0, 1, 1.0);
+    G.addEdge(1, 2, 1.0);
+    G.addEdge(0, 2, 5.0);
+
+    DynamicDijkstra engine(G, 0);
+    DijkstraState st = engine.recompute();
+
+    REQUIRE(st.parent[0] == -1);
+    REQUIRE(st.parent[1] == 0);
+    REQUIRE(st.parent[2] == 1); // SPT uses 0->1->2
+
+    SECTION("Increase on tree edge (1,2) should require recompute") {
+        double oldW = G.updateEdgeWeight(1, 2, 10.0);
+        REQUIRE(approx_equal(oldW, 1.0));
+
+        bool needs = engine.requiresRecomputeOnIncrease(st, 1, 2);
+        CHECK(needs); // true: edge is on the SPT
+    }
+
+    SECTION("Increase on non-tree edge (0,2) should NOT require recompute") {
+        double oldW = G.updateEdgeWeight(0, 2, 10.0);
+        REQUIRE(approx_equal(oldW, 5.0));
+
+        bool needs = engine.requiresRecomputeOnIncrease(st, 0, 2);
+        CHECK_FALSE(needs); // false: edge is not on the SPT
+    }
+}
