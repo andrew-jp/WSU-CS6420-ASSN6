@@ -100,7 +100,7 @@ int main() {
 
     // Experiment parameters
     int n = 2000;
-    int m = 8000;          // density lever
+    int m = 30000;          // density lever
     int source = 0;
     int numUpdates = 1000; // streaming updates
     double maxW = 100.0;
