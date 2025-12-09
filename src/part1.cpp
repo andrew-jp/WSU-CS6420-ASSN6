@@ -94,13 +94,9 @@ bool approxEqual(const vector<double>& a, const vector<double>& b, double eps=1e
     return true;
 }
 
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
+void test(int n, int m) {
+        // Experiment parameters
 
-    // Experiment parameters
-    int n = 2000;
-    int m = 30000;          // density lever
     int source = 0;
     int numUpdates = 1000; // streaming updates
     double maxW = 100.0;
@@ -158,7 +154,7 @@ int main() {
             cerr << "Mismatch detected at update " << i
                  << " edge(" << up.u << "," << up.v << ")"
                  << " oldW=" << up.oldW << " newW=" << up.newW << "\n";
-            return 1;
+            return;
         }
 
         if (i % 200 == 0) {
@@ -176,6 +172,15 @@ int main() {
 
     double speedup = (incMsTotal > 0) ? (double)fullMsTotal / (double)incMsTotal : 0.0;
     cout << "Observed speedup (full/inc): " << speedup << "x\n";
+    cout << "\n========================\n";
+
+}
+
+int main() {
+    test(2000, 4000);
+    test(2000, 8000);
+    test(2000, 16000);
+    test(2000, 32000);
 
     return 0;
 }
